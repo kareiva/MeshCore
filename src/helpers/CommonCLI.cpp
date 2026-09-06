@@ -167,14 +167,34 @@ void CommonCLI::savePrefs() {
 }
 
 uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
+  const char* name = _prefs->node_name;
+  char name_buf[sizeof(_prefs->node_name)];
+
+  if (node_type == ADV_TYPE_REPEATER) {
+    uint16_t mv = _board->getBattMilliVolts();
+    if (mv < 10000) {  // fits "d.dV" (4 chars); skip suffix otherwise
+      char batt[5];
+      snprintf(batt, sizeof(batt), "%d.%dV", mv / 1000, (mv / 100) % 10);
+
+      int base_len = strlen(_prefs->node_name);
+      int max_base_len = (int)sizeof(name_buf) - 1 - 4; // reserve last 4 bytes for battery suffix
+      if (base_len > max_base_len) base_len = max_base_len;
+
+      memcpy(name_buf, _prefs->node_name, base_len);
+      memcpy(name_buf + base_len, batt, 4);
+      name_buf[base_len + 4] = 0;
+      name = name_buf;
+    }
+  }
+
   if (_prefs->advert_loc_policy == ADVERT_LOC_NONE) {
-    AdvertDataBuilder builder(node_type, _prefs->node_name);
+    AdvertDataBuilder builder(node_type, name);
     return builder.encodeTo(app_data);
   } else if (_prefs->advert_loc_policy == ADVERT_LOC_SHARE) {
-    AdvertDataBuilder builder(node_type, _prefs->node_name, _sensors->node_lat, _sensors->node_lon);
+    AdvertDataBuilder builder(node_type, name, _sensors->node_lat, _sensors->node_lon);
     return builder.encodeTo(app_data);
   } else {
-    AdvertDataBuilder builder(node_type, _prefs->node_name, _prefs->node_lat, _prefs->node_lon);
+    AdvertDataBuilder builder(node_type, name, _prefs->node_lat, _prefs->node_lon);
     return builder.encodeTo(app_data);
   }
 }
